@@ -3,6 +3,8 @@
 A native recompilation of **Super Mario World 2: Yoshi's Island** (USA), built on
 [snesrecomp](https://github.com/RetroPortingToolKit/snesrecomp).
 
+<a href="https://recomplauncher.com/game/smw2recomp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://recomplauncher.com/assets/press/launcher/badge-light.svg"><img alt="Get it on RecompLauncher" src="https://recomplauncher.com/assets/press/launcher/badge-dark.svg" height="48"></picture></a>
+
 Yoshi's Island is Nintendo's 1995 platformer for the Super NES: Yoshi carries
 baby Mario across the island to rescue his brother Luigi from Kamek and Baby
 Bowser. Its hand-drawn look, with sprites stretched, rotated and morphed on the
@@ -41,6 +43,11 @@ On first run:
    the file name does not matter, the contents are checked).
 4. Press **Generate & rebuild**. The playable game is built into `build/` and
    started; run it from there afterwards.
+
+[RecompLauncher](https://recomplauncher.com) can install it too: the release
+carries a `recomplauncher.json`, so the launcher asks for your ROM, opens this
+same setup with it already picked, and shows the window, picture and sound
+settings on the game's page.
 
 In the launcher, **Settings → Shader** lists the scanline, CRT and upscaler
 presets; choosing one switches the renderer to OpenGL automatically. A fresh
@@ -102,8 +109,10 @@ world and boss is not yet verified. See [Porting from here](#porting-from-here).
 Reapply them after updating the submodules:
 
 ```sh
+git -C snesrecomp apply ../patches/snesrecomp-apu-first-read-timeline.patch
 git -C snesrecomp apply ../patches/snesrecomp-audio-interpolation.patch
 git -C snesrecomp apply ../patches/snesrecomp-glsl-passprev-and-vao.patch
+git -C snesrecomp apply ../patches/snesrecomp-joypad-manual-strobe.patch
 git -C snesrecomp apply ../patches/snesrecomp-mosaic-frame-model.patch
 git -C snesrecomp apply ../patches/snesrecomp-nmi-idle-loop-wai.patch
 git -C snesrecomp apply ../patches/snesrecomp-nmi-wai-in-handler.patch
@@ -111,6 +120,8 @@ git -C snesrecomp apply ../patches/snesrecomp-raster-oam-and-hdma.patch
 git -C snesrecomp apply ../patches/snesrecomp-raster-vram-journal.patch
 git -C snesrecomp apply ../patches/snesrecomp-resume-state-restart.patch
 git -C snesrecomp apply ../patches/snesrecomp-shader-forces-opengl.patch
+git -C snesrecomp apply ../patches/snesrecomp-state-load-raster-reset.patch
+git -C snesrecomp apply ../patches/snesrecomp-timing-frame-pacing.patch
 git -C recomp-ui apply ../patches/recomp-ui-host-toggle.patch
 ```
 
@@ -171,6 +182,34 @@ path left the plain path's vertex attributes disabled.
 
 `snesrecomp-shader-forces-opengl.patch` switches the renderer to OpenGL when a
 shader is picked, since the presets only run there.
+
+`snesrecomp-apu-first-read-timeline.patch` lets the sound chip run from power
+on when the game reads its ports before writing them. Kirby Super Star read
+the sound port once, right after the SA-1 finishes its start-up, and uploads
+its sound driver only if the chip's boot ROM answers; the framework started
+the sound chip's clock at the first port write, so the read found nothing and
+the game waited forever on a black screen.
+
+`snesrecomp-joypad-manual-strobe.patch` passes the manual-read strobe
+($4016 write) to the controller. The reads already reached it, the strobe did
+not, so a game that reads the pad by hand got its sixteen buttons once and then
+every button held, for good. Bart's Nightmare reads the pad that way in the
+doors and the nightmares: it chose a door by itself and, inside a nightmare,
+fell into its pause screen and waited for a Start press that could never come
+(the picture frozen, the music still playing).
+
+`snesrecomp-state-load-raster-reset.patch` re-arms the raster journal when a
+save state loads. The journal keeps the register file as the last field
+started and puts it back before drawing, so after a load the previous scene's
+BG mode, tilemaps and windows replaced the state's; a scene that sets them only
+once (Bart's Nightmare's title, its doors) stayed garbled until it changed.
+
+`snesrecomp-timing-frame-pacing.patch` keeps the game at the console's 60.1
+frames per second. A frame whose CPU half runs past the end of the field is
+followed by a shorter one, and the host counted the overrun twice (the short
+frame was raised to a whole one); it also waited past its deadlines and threw
+the lateness away. Flashback's polygon intro, which overruns often, ran at
+58.9 fps and fell behind the console; now 59.9, with the same pictures.
 
 `recomp-ui-host-toggle.patch` lets a title add one checkbox of its own beside
 "Skip launcher on boot"; this project uses it for the update check.
