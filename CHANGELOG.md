@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.3 — 2026-11-11
+
+Framework fixes from Flashback and Bart's Nightmare, and RecompLauncher
+support. The game keeps the console's frame rate when a frame runs long (the
+sound chip's clock no longer counts the overrun twice); a game that reads the
+controller by hand gets fresh buttons on every read; a save state loaded in
+another scene is no longer drawn with the previous scene's registers. The
+release carries a `recomplauncher.json` for
+[RecompLauncher](https://recomplauncher.com). Same pictures in play (one fade
+in the intro lands a frame earlier); saves and save states from 0.1.2 keep
+working.
+
 ## 0.1.2 — 2026-11-05
 
 Changing a setting during play no longer sends the game back to the start.
