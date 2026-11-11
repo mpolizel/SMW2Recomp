@@ -2,14 +2,22 @@
 
 ## 0.1.3 — 2026-11-11
 
-Framework fixes from Bart's Nightmare and RecompLauncher support. A game
-that reads the controller by hand gets fresh buttons on every read ($4016
-strobe); a save state loaded in another scene is no longer drawn with the
-previous scene's registers; the sound chip runs from power on for a game that
-reads it first. The release carries a `recomplauncher.json` for
-[RecompLauncher](https://recomplauncher.com). Normal play is unchanged (the
-test run gives the same pictures, frame by frame); saves and save states from
-0.1.2 keep working.
+Current snesrecomp and recomp-ui, and RecompLauncher's recommendations. The
+framework brings its access-exact sound timing (a per-clock S-DSP), sprite
+priority, brightness-rounding, HDMA and mosaic fixes. A game that reads the
+controller by hand gets fresh buttons on every read ($4016 strobe); a save
+state loaded in another scene is no longer drawn with the previous scene's
+registers; the sound chip runs from power on for a game that reads it first.
+Save states now keep the CPU's place, so one loaded on the title or during
+the story no longer resumes in the wrong loop. Your in-game saves and the
+save states from 0.1.2 keep loading, with the music playing on (the old
+sound state is converted). With [RecompLauncher](https://recomplauncher.com)
+the game builds on the launcher's setup screen, Play goes straight into the
+game, Big Picture opens full screen, and the renderer and shader are on the
+game's page. Controllers are no longer read while the window is in the
+background ([General] BackgroundInput = 1 restores that); the log keeps the
+last runs. The update check on start stays; when RecompLauncher starts the
+game it leaves updates to the launcher.
 
 ## 0.1.2 — 2026-11-05
 
