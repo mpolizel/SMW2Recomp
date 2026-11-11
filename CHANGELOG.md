@@ -2,15 +2,14 @@
 
 ## 0.1.3 — 2026-11-11
 
-Framework fixes from Flashback and Bart's Nightmare, and RecompLauncher
-support. The game keeps the console's frame rate when a frame runs long (the
-sound chip's clock no longer counts the overrun twice); a game that reads the
-controller by hand gets fresh buttons on every read; a save state loaded in
-another scene is no longer drawn with the previous scene's registers. The
-release carries a `recomplauncher.json` for
-[RecompLauncher](https://recomplauncher.com). Same pictures in play (one fade
-in the intro lands a frame earlier); saves and save states from 0.1.2 keep
-working.
+Framework fixes from Bart's Nightmare and RecompLauncher support. A game
+that reads the controller by hand gets fresh buttons on every read ($4016
+strobe); a save state loaded in another scene is no longer drawn with the
+previous scene's registers; the sound chip runs from power on for a game that
+reads it first. The release carries a `recomplauncher.json` for
+[RecompLauncher](https://recomplauncher.com). Normal play is unchanged (the
+test run gives the same pictures, frame by frame); saves and save states from
+0.1.2 keep working.
 
 ## 0.1.2 — 2026-11-05
 

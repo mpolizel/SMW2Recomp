@@ -121,7 +121,6 @@ git -C snesrecomp apply ../patches/snesrecomp-raster-vram-journal.patch
 git -C snesrecomp apply ../patches/snesrecomp-resume-state-restart.patch
 git -C snesrecomp apply ../patches/snesrecomp-shader-forces-opengl.patch
 git -C snesrecomp apply ../patches/snesrecomp-state-load-raster-reset.patch
-git -C snesrecomp apply ../patches/snesrecomp-timing-frame-pacing.patch
 git -C recomp-ui apply ../patches/recomp-ui-host-toggle.patch
 ```
 
@@ -203,13 +202,6 @@ save state loads. The journal keeps the register file as the last field
 started and puts it back before drawing, so after a load the previous scene's
 BG mode, tilemaps and windows replaced the state's; a scene that sets them only
 once (Bart's Nightmare's title, its doors) stayed garbled until it changed.
-
-`snesrecomp-timing-frame-pacing.patch` keeps the game at the console's 60.1
-frames per second. A frame whose CPU half runs past the end of the field is
-followed by a shorter one, and the host counted the overrun twice (the short
-frame was raised to a whole one); it also waited past its deadlines and threw
-the lateness away. Flashback's polygon intro, which overruns often, ran at
-58.9 fps and fell behind the console; now 59.9, with the same pictures.
 
 `recomp-ui-host-toggle.patch` lets a title add one checkbox of its own beside
 "Skip launcher on boot"; this project uses it for the update check.
