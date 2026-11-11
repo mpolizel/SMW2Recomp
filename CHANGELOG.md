@@ -4,7 +4,7 @@
 
 Changing a setting during play no longer sends the game back to the start.
 A few settings (renderer, audio output and rate, mods) need the game to
-restart; it saves the moment it leaves to `savesesume.sav` and comes back
+restart; it saves the moment it leaves to `saves\resume.sav` and comes back
 to it, but it came back without the CPU's registers and resume point, so it
 booted from power-on (or, with only half the state back, showed a black
 picture over the stage's music). That one-shot file now holds the whole
