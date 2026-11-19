@@ -1,8 +1,8 @@
 diff --git a/runner/src/snes/ppu.c b/runner/src/snes/ppu.c
-index 896891c..772b723 100644
+index 896891c..086ceaa 100644
 --- a/runner/src/snes/ppu.c
 +++ b/runner/src/snes/ppu.c
-@@ -3674,6 +3674,16 @@ static uint16_t s_raster_render_vram[0x8000];
+@@ -3674,6 +3674,15 @@ static uint16_t s_raster_render_vram[0x8000];
  static uint8_t s_raster_live_high_oam[0x20];
  static int s_raster_cg_next;
  static uint16_t s_raster_live_cgram[0x100]; /* the guest's CGRAM during a render */
@@ -15,22 +15,18 @@ index 896891c..772b723 100644
 + * (Yoshi's Island's map after a bonus game drew the bonus game's BG mode and
 + * tile bases on every other frame). */
 +static uint8_t s_raster_live_regs[PPU_SAVESTATE_REGS_SIZE];
-+static uint8_t s_raster_live_scroll_prev, s_raster_live_scroll_prev2, s_raster_live_m7prev;
  
  /* Only the machine's PPU journals: the debug server and a few tools run
   * ppu_write on scratch copies. */
-@@ -3904,6 +3914,10 @@ void ppu_rasterRenderBegin(Ppu *ppu) {
+@@ -3904,6 +3913,7 @@ void ppu_rasterRenderBegin(Ppu *ppu) {
    s_raster_port.oamInHigh = ppu->oamInHigh;
    s_raster_port.oamSecondWrite = ppu->oamSecondWrite;
    s_raster_port.oamBuffer = ppu->oamBuffer;
 +  memcpy(s_raster_live_regs, &ppu->inidisp, PPU_SAVESTATE_REGS_SIZE);
-+  s_raster_live_scroll_prev = ppu->scrollPrev;
-+  s_raster_live_scroll_prev2 = ppu->scrollPrev2;
-+  s_raster_live_m7prev = ppu->m7prev;
    memcpy(&ppu->inidisp, f->regs, PPU_SAVESTATE_REGS_SIZE);
    ppu->scrollPrev = f->scrollPrev;
    ppu->scrollPrev2 = f->scrollPrev2;
-@@ -4026,12 +4040,43 @@ void ppu_rasterRenderEnd(Ppu *ppu) {
+@@ -4026,12 +4036,40 @@ void ppu_rasterRenderEnd(Ppu *ppu) {
    int i;
    if (!s_raster_armed || !s_raster_rendering) return;
    s_raster_rendering = 0;
@@ -68,9 +64,6 @@ index 896891c..772b723 100644
 +              "baseline had stale\n", stale);
 +    }
 +  }
-+  ppu->scrollPrev = s_raster_live_scroll_prev;
-+  ppu->scrollPrev2 = s_raster_live_scroll_prev2;
-+  ppu->m7prev = s_raster_live_m7prev;
    ppu->oamAdr = s_raster_port.oamAdr;
    ppu->oamInHigh = s_raster_port.oamInHigh;
    ppu->oamSecondWrite = s_raster_port.oamSecondWrite;
