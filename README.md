@@ -121,6 +121,7 @@ git -C snesrecomp apply ../patches/snesrecomp-nmi-idle-loop-wai.patch
 git -C snesrecomp apply ../patches/snesrecomp-nmi-wai-in-handler.patch
 git -C snesrecomp apply ../patches/snesrecomp-raster-oam-and-hdma.patch
 git -C snesrecomp apply ../patches/snesrecomp-raster-vram-journal.patch
+git -C snesrecomp apply ../patches/snesrecomp-raster-vram-live-regs.patch
 git -C snesrecomp apply ../patches/snesrecomp-recomplauncher.patch
 git -C snesrecomp apply ../patches/snesrecomp-resume-state-restart.patch
 git -C snesrecomp apply ../patches/snesrecomp-shader-forces-opengl.patch
@@ -153,6 +154,19 @@ Yoshi walked, because the next frame's offset table, uploaded at line 217,
 was drawn under this frame's fine scroll. With video memory journaled, the
 per-line sprite table of `snesrecomp-raster-oam-and-hdma.patch` applies to
 every frame that rewrites it again.
+
+`snesrecomp-raster-vram-live-regs.patch` gives the game back its own register
+file after each render. The renderer draws a frame from that frame's starting
+registers and, until now, rebuilt the game's registers afterwards from the
+next frame's writes alone, so a register the game had set once and left
+alone took the drawn frame's starting value. The renderer keeps two frames,
+and once their starting values disagreed they stayed that way: after the
+Scratch and Match bonus game, the world map was drawn on every other frame
+with the bonus game's BG mode and tile bases (the map flickered between the
+island and a field of stray tiles). What the render writes (the frame's own
+writes and its HDMA) still stands, as on hardware; a byte the render did not
+write is the game's. The log notes, a few times a session, when that put a
+byte back (`[raster] kept N register byte(s)`).
 
 `snesrecomp-resume-state-restart.patch` makes a setting that needs a restart
 come back to the same moment. The in-game launcher saves `saves\resume.sav`,

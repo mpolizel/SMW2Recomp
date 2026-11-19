@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.4 — 2026-11-19
+
+The world map no longer flickers after a bonus game. Once a stage had ended
+in the Scratch and Match bonus game, the map below the stage list showed the
+island on one frame and a field of stray tiles on the next, which a
+screenshot or a recording catches as a scrambled island. The renderer
+rebuilt the game's video registers after each frame from the latest writes
+alone, so a register set once (here, the map's BG mode and tile bases) could
+keep a value from before the map, on every other frame. It now keeps the
+game's own value. Your in-game saves and save states from 0.1.3 keep
+loading.
+
 ## 0.1.3 — 2026-11-11
 
 Current snesrecomp and recomp-ui, and RecompLauncher's recommendations. The
