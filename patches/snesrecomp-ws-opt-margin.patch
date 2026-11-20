@@ -1,16 +1,17 @@
 diff --git a/runner/src/snes/ppu.c b/runner/src/snes/ppu.c
-index 086ceaa..e51931b 100644
+index ab37fe9..840caef 100644
 --- a/runner/src/snes/ppu.c
 +++ b/runner/src/snes/ppu.c
-@@ -495,6 +495,16 @@ void PpuSetWidescreenLayerMask(Ppu *ppu, uint8_t bg_layer_mask) {
+@@ -495,6 +495,17 @@ void PpuSetWidescreenLayerMask(Ppu *ppu, uint8_t bg_layer_mask) {
    ppu->wsLayerWidenMask = bg_layer_mask & 0x0f;
  }
  
 +void PpuSetWidescreenOptMarginV(Ppu *ppu, int first_col, const uint16_t *v,
-+                                unsigned count) {
++                                unsigned count, uint16_t table_hscroll) {
 +  if (!ppu) return;
 +  if (!v || count == 0) { ppu->wsOptMarginCount = 0; return; }
 +  if (count > 128) count = 128;
++  ppu->wsOptMarginHScroll = table_hscroll;
 +  ppu->wsOptMarginFirst = (int16_t)first_col;
 +  ppu->wsOptMarginCount = (uint16_t)count;
 +  memcpy(ppu->wsOptMarginV, v, count * sizeof(uint16_t));
@@ -19,7 +20,7 @@ index 086ceaa..e51931b 100644
  void PpuSetMode2LayerCapture(Ppu *ppu, int layer) {
    ppu->wsMode2CaptureLayer = layer >= 0 && layer < 2 ? (uint8_t)(layer + 1) : 0;
  }
-@@ -1762,7 +1772,23 @@ static void PpuDrawBackground_4bpp_opt(Ppu *ppu, uint y, bool sub, uint layer,
+@@ -1762,7 +1773,36 @@ static void PpuDrawBackground_4bpp_opt(Ppu *ppu, uint y, bool sub, uint layer,
        const int source_screen_x = screen_x + sample_bias;
        unsigned hoffset = hscroll;
        unsigned voffset = vscroll;
@@ -31,24 +32,37 @@ index 086ceaa..e51931b 100644
 +         * counted like the native one; the horizontal row stays the wrapped
 +         * hardware row. */
 +        const int opt_pos = (int)opt_hscroll + source_screen_x - 1;
-+        const int k = (opt_pos >= 0 ? opt_pos : opt_pos - 7) / 8 -
-+                      ppu->wsOptMarginFirst;
++        /* The row was built for the scroll in wsOptMarginHScroll; shift it
++         * by the whole columns the layer has moved since. */
++        int shift = (int)((hscroll >> 3) & 63) -
++                    (int)((ppu->wsOptMarginHScroll >> 3) & 63);
++        if (shift >= 32) shift -= 64;
++        if (shift < -32) shift += 64;
++        const int col = (opt_pos >= 0 ? opt_pos : opt_pos - 7) / 8;
++        const int k = col + shift - ppu->wsOptMarginFirst;
 +        const int opt_x = (int)(((unsigned)opt_pos & opt_coord_mask) >> opt_shift);
 +        const uint16 hcell = PpuReadTilemapEntry(ppu, 2, opt_x, opt_hrow);
 +        if (hcell & enable)
 +          hoffset = (hcell & ~7) | (hscroll & 7);
-+        if (k >= 0 && k < (int)ppu->wsOptMarginCount &&
-+            (ppu->wsOptMarginV[k] & enable))
++        if (col >= 0 && col < 32) {
++          /* The tile straddling a native edge still belongs to a column the
++           * game's own row covers. */
++          const uint16 vcell = PpuReadTilemapEntry(ppu, 2, opt_x, opt_vrow);
++          if (vcell & enable)
++            voffset = vcell;
++        } else if (k >= 0 && k < (int)ppu->wsOptMarginCount &&
++                   (ppu->wsOptMarginV[k] & enable)) {
 +          voffset = ppu->wsOptMarginV[k];
++        }
 +      } else if (source_screen_x < 8 - (int)(hscroll & 7)) {
          /* The SNES cannot apply OPT to the leftmost source-tile column. */
        } else {
          const unsigned opt_pos =
 diff --git a/runner/src/snes/ppu.h b/runner/src/snes/ppu.h
-index a7384c9..985c8a5 100644
+index 335ebb4..45f84a2 100644
 --- a/runner/src/snes/ppu.h
 +++ b/runner/src/snes/ppu.h
-@@ -256,6 +256,12 @@ struct Ppu {
+@@ -256,6 +256,13 @@ struct Ppu {
    // Optional native-width Mode 2 layer capture. Stored as layer+1 so zero is
    // disabled; pixels are palette indices for the most recently drawn frame.
    uint8_t wsMode2CaptureLayer;
@@ -57,11 +71,12 @@ index a7384c9..985c8a5 100644
 +  // native row being 0..31; wsOptMarginCount 0 = off.
 +  int16_t wsOptMarginFirst;
 +  uint16_t wsOptMarginCount;
++  uint16_t wsOptMarginHScroll;
 +  uint16_t wsOptMarginV[128];
    uint8_t wsMode2Capture[224][kPpuXPixels];
    uint8_t wsMode2Bg1Palette[224][kPpuXPixels];
    // Per-layer widescreen policies. Bit L refers to BG(L+1), layer 0..3.
-@@ -929,6 +935,16 @@ void PpuSetWidescreenLayerMask(Ppu *ppu, uint8_t bg_layer_mask);
+@@ -929,6 +936,18 @@ void PpuSetWidescreenLayerMask(Ppu *ppu, uint8_t bg_layer_mask);
  // only margins without evaluating offset-per-tile data outside the real SNES
  // viewport. Pass layer 0 or 1; any other value disables capture.
  void PpuSetMode2LayerCapture(Ppu *ppu, int layer);
@@ -73,8 +88,10 @@ index a7384c9..985c8a5 100644
 +// the way the native row is (column k spans screen x 8k+1..8k+8 at BG3
 +// HOFS 0), negative and >= 32 allowed. Native columns keep the real row.
 +// count 0 disables; margins then read the wrapped hardware row as before.
++// table_hscroll is the layer's horizontal scroll the row was built for; a
++// render at another scroll shifts the row by whole columns to match.
 +void PpuSetWidescreenOptMarginV(Ppu *ppu, int first_col, const uint16_t *v,
-+                                unsigned count);
++                                unsigned count, uint16_t table_hscroll);
  const uint8_t *PpuGetMode2LayerCapture(const Ppu *ppu);
  const uint8_t *PpuGetMode2Bg1Palette(const Ppu *ppu);
  

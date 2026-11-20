@@ -274,6 +274,7 @@ enum { kOptFirst = -32, kOptCount = 96 };
 static uint16_t s_opt_row[kOptCount];
 static bool s_opt_used;
 static int s_opt_shift;
+static uint16_t s_opt_cam;
 
 static void Smw2OptShiftCamera(SuperFx *fx, uint32_t pc24, void *ctx)
 {
@@ -290,12 +291,16 @@ static void Smw2OptRoutine(SuperFx *fx, uint32_t pc24, void *ctx)
     if (!ram) ram = (uint8_t *)malloc(fx->ram_size);
     if (!ram) return;
     const SuperFxReplayPcHook hook = { pc24, Smw2OptShiftCamera, NULL };
-    for (int side = 0; side < 2; side++) {
-        s_opt_shift = side ? 256 : -256;
+    s_opt_cam = superfx_reg(fx, 8);
+    /* The row is built one frame ahead of the scroll it is drawn with, so
+     * the renderer may shift it by a column and reach into the native part:
+     * keep that part too (side 1), next to the left and right ones. */
+    for (int side = 0; side < 3; side++) {
+        s_opt_shift = (side - 1) * 256;
         memcpy(ram, fx->ram, fx->ram_size);
         if (!superfx_replay_snapshot_with_hooks(fx, ram, &result, &hook, 1)) return;
         for (int i = 0; i < 32; i++) {
-            const int k = (side ? 32 + i : i - 32) - kOptFirst;
+            const int k = (side - 1) * 32 + i - kOptFirst;
             s_opt_row[k] = (uint16_t)(ram[0x1F32 + 2 * i] | ram[0x1F33 + 2 * i] << 8);
         }
     }
@@ -374,9 +379,9 @@ static void Smw2BeginFrame(unsigned number)
         if (s_log) fprintf(stderr, "[wsopt] used=%d bgmode=%02X row0=%04X row40=%04X row60=%04X\n",
                            (int)s_opt_used, g_ppu->bgmode, s_opt_row[0], s_opt_row[40], s_opt_row[60]);
         if (s_opt_used && (g_ppu->bgmode & 7) == 2)
-            PpuSetWidescreenOptMarginV(g_ppu, kOptFirst, s_opt_row, kOptCount);
+            PpuSetWidescreenOptMarginV(g_ppu, kOptFirst, s_opt_row, kOptCount, s_opt_cam);
         else
-            PpuSetWidescreenOptMarginV(g_ppu, 0, NULL, 0);
+            PpuSetWidescreenOptMarginV(g_ppu, 0, NULL, 0, 0);
         s_opt_used = false;
         /* In a stage BG3 is scenery (the foreground plants of 1-1), not a
          * status bar: let it fill the margins too. */
