@@ -244,13 +244,51 @@ static void Smw2BeginFrame(unsigned number)
         return;
     const int budget = g_ws_extra;
     PpuSetWidescreenViewAnchor(g_ppu, true);
+    static int s_log = -1;
+    if (s_log < 0) s_log = getenv("WS_LOG") != NULL;
+    if (s_log) {
+        static unsigned n;
+        fprintf(stderr, "[wslog] %u mode=%02X tm=%02X ts=%02X tmw=%02X tsw=%02X wsel=%06X w1=%u-%u w2=%u-%u cgw=%02X cga=%02X\n",
+                n++, g_ram[0x118], g_ppu->screenEnabled[0], g_ppu->screenEnabled[1],
+                g_ppu->screenWindowed[0], g_ppu->screenWindowed[1], (unsigned)g_ppu->windowsel,
+                g_ppu->window1left, g_ppu->window1right, g_ppu->window2left, g_ppu->window2right,
+                g_ppu->cgwsel, g_ppu->cgadsub);
+    }
     static bool s_was_level;
     const bool level = g_ram[0x118] == 0x0F;
     if (level) {
         const int cam_x = g_ram[0x39] | g_ram[0x3A] << 8;
         const int cam_y = g_ram[0x3B] | g_ram[0x3C] << 8;
-        const int left = cam_x < budget ? cam_x : budget;
-        PpuSetExtraSideSpace(g_ppu, left, 2 * budget - left, 0);
+        /* Level edges: the outermost screen columns that exist in the rows
+         * the view spans ($70:0CAA, $80 = no screen). */
+        int lvl_left = 0, lvl_right = 16 * 256;
+        const Cart *lc = g_snes ? g_snes->cart : NULL;
+        if (lc && lc->ram && lc->ramSize >= 0x0CAA + 128) {
+            int r0 = cam_y >> 8, r1 = (cam_y + 223) >> 8, cmin = 16, cmax = -1;
+            for (int r = r0; r <= r1 && r < 8; r++)
+                for (int c = 0; c < 16; c++)
+                    if (r >= 0 && lc->ram[0x0CAA + r * 16 + c] != 0x80) {
+                        if (c < cmin) cmin = c;
+                        if (c > cmax) cmax = c;
+                    }
+            if (cmax >= 0) { lvl_left = cmin * 256; lvl_right = (cmax + 1) * 256; }
+        }
+        int room_l = cam_x - lvl_left, room_r = lvl_right - (cam_x + 256);
+        if (room_l < 0) room_l = 0;
+        if (room_r < 0) room_r = 0;
+        int left = room_l < budget ? room_l : budget;
+        int right = room_r < 2 * budget - left ? room_r : 2 * budget - left;
+        if (left < 2 * budget - right) left = room_l < 2 * budget - right ? room_l : 2 * budget - right;
+        /* Iris and wipe transitions (stage start and end, death) mask the
+         * layers with window 1, edges rewritten per line by HDMA; play has
+         * TMW set but no layer window enabled (windowsel 0). The windows only
+         * cover the native 256 columns, so black bars while a layer window
+         * is on, or while the colour window clips to black. */
+        const bool windowed = (g_ppu->screenWindowed[0] | g_ppu->screenWindowed[1]) &&
+                              (g_ppu->windowsel & 0xAAAAAA) != 0;
+        (void)windowed;   /* message boxes use layer windows too: not a transition */
+        if (PPU_clipMode(g_ppu) != 0) left = right = 0;
+        PpuSetExtraSideSpace(g_ppu, left, right, 0);
         /* In a stage BG3 is scenery (the foreground plants of 1-1), not a
          * status bar: let it fill the margins too. */
         PpuSetWidescreenBg3Widen(g_ppu, 1);
@@ -275,6 +313,24 @@ static void Smw2BeginFrame(unsigned number)
     WsShadowFrame(g_ppu);
 }
 
+/* Columns outside the live margins are not drawn this frame (pillarbox):
+ * clear them, or they keep the last picture that reached them. */
+static void Smw2EndFrame(const uint8_t *field, unsigned number)
+{
+    (void)number;
+    if (!g_ws_active || !field) return;
+    const int fw = 256 + 2 * g_ws_extra;
+    const int l0 = g_ppu->extraFrameLeft - g_ppu->extraLeftCur;
+    const int r0 = g_ppu->extraFrameLeft + 256 + g_ppu->extraRightCur;
+    if (l0 <= 0 && r0 >= fw) return;
+    uint8_t *px = (uint8_t *)field;
+    for (int y = 0; y < 224; y++) {
+        uint8_t *row = px + (size_t)y * fw * 4;
+        if (l0 > 0) memset(row, 0, (size_t)l0 * 4);
+        if (r0 < fw) memset(row + (size_t)r0 * 4, 0, (size_t)(fw - r0) * 4);
+    }
+}
+
 static const SnesDesktopHostGame kGameHost = {
     .display_name        = "Super Mario World 2: Yoshi's Island",
     .window_title        = "Super Mario World 2: Yoshi's Island",
@@ -292,6 +348,7 @@ static const SnesDesktopHostGame kGameHost = {
     .native_widescreen   = 1,
     .prepare_frame       = Smw2PrepareFrame,
     .begin_sim_frame     = Smw2BeginFrame,
+    .end_sim_frame       = Smw2EndFrame,
 #ifdef RECOMP_LAUNCHER
     .configure_launcher  = Smw2ConfigureLauncher,
 #endif
