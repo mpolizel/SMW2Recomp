@@ -233,20 +233,31 @@ static void Smw2SetSpawnColumns(bool wide)
 }
 
 /* OAM build ($08:B1D8, Super FX): a sprite tile goes to OAM only while
- * -15 <= x < $100 (IWT R8,#$0100 at $08:B21E), and X bit 8 is set only for
- * a negative x. For the right margin the upper bound follows the live right
- * margin each frame, and bit 8 becomes (x >> 8) & 1 (same 8 bytes at
- * $08:B227: MOVE R11,R0 / FROM R0 TO R9 HIB / WITH R9 AND #1), so a tile at
- * x 256..256+margin is written as the raw 9-bit X the renderer places in the
- * right margin. The left bound (-15) is shared with Y and stays. */
-static void Smw2SetOamClip(bool wide, int right_margin)
+ * -15 <= x < $100 (CMP R7 / IWT R8,#$0100 / CMP R8 at $08:B219, R7 = -15
+ * is shared with the Y test), and X bit 8 is set only for a negative x.
+ * With widescreen the X test becomes one unsigned compare in the same 12
+ * bytes, x + K < W with K = 15 + left margin and W = 271 + both margins
+ * (IWT R8,#K / WITH R8 ADD R0 / IWT R9,#W / WITH R8 SUB R9 / BCS; the
+ * INC R6 after it runs in the delay slot on both paths, which is harmless:
+ * R6 is reloaded from R1 for the next tile). Bit 8 becomes (x >> 8) & 1
+ * (8 bytes at $08:B227: MOVE R11,R0 / FROM R0 TO R9 HIB / WITH R9 AND #1),
+ * so x in either margin is written as the raw 9-bit X the renderer places
+ * there. Margins follow the live view every frame. */
+static void Smw2SetOamClip(bool wide, int left_margin, int right_margin)
 {
     Cart *cart = g_snes ? g_snes->cart : NULL;
     if (!cart || !cart->rom || cart->romSize < 0x43230) return;
-    static const uint8_t kOrig[8] = { 0xA9, 0x00, 0x2B, 0xB0, 0x0A, 0x02, 0x01, 0xD9 };
-    static const uint8_t kWide[8] = { 0x2B, 0xB0, 0xB0, 0x19, 0xC0, 0x29, 0x3E, 0x71 };
-    memcpy(cart->rom + 0x43227, wide ? kWide : kOrig, 8);
-    Smw2PatchWord(cart, 0x4321F, (uint16_t)(0x100 + (wide ? right_margin : 0)));
+    static const uint8_t kOrigX[12] = { 0x3F, 0x67, 0x07, 0x58, 0x01, 0xF8, 0x00, 0x01, 0x3F, 0x68, 0x06, 0x50 };
+    static const uint8_t kOrigHi[8] = { 0xA9, 0x00, 0x2B, 0xB0, 0x0A, 0x02, 0x01, 0xD9 };
+    static const uint8_t kWideHi[8] = { 0x2B, 0xB0, 0xB0, 0x19, 0xC0, 0x29, 0x3E, 0x71 };
+    uint8_t *x = cart->rom + 0x43219, *hi = cart->rom + 0x43227;
+    if (!wide) { memcpy(x, kOrigX, 12); memcpy(hi, kOrigHi, 8); return; }
+    const uint16_t k = (uint16_t)(15 + left_margin);
+    const uint16_t w = (uint16_t)(256 + 15 + left_margin + right_margin);
+    const uint8_t code[12] = { 0xF8, (uint8_t)k, (uint8_t)(k >> 8), 0x28, 0x50,
+                               0xF9, (uint8_t)w, (uint8_t)(w >> 8), 0x28, 0x69, 0x0D, 0x50 };
+    memcpy(x, code, 12);
+    memcpy(hi, kWideHi, 8);
 }
 
 static void Smw2BeginFrame(unsigned number)
@@ -306,7 +317,7 @@ static void Smw2BeginFrame(unsigned number)
         (void)windowed;   /* message boxes use layer windows too: not a transition */
         if (PPU_clipMode(g_ppu) != 0) left = right = 0;
         PpuSetExtraSideSpace(g_ppu, left, right, 0);
-        Smw2SetOamClip(true, right);
+        Smw2SetOamClip(true, left, right);
         /* In a stage BG3 is scenery (the foreground plants of 1-1), not a
          * status bar: let it fill the margins too. */
         PpuSetWidescreenBg3Widen(g_ppu, 1);
@@ -325,7 +336,7 @@ static void Smw2BeginFrame(unsigned number)
         }
     } else {
         PpuSetExtraSideSpace(g_ppu, 0, 0, 0);
-        Smw2SetOamClip(true, 0);
+        Smw2SetOamClip(true, 0, 0);
         if (s_was_level) WsShadowReset();
     }
     s_was_level = level;
