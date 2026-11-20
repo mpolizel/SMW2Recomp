@@ -180,9 +180,31 @@ static WsShadowSource Smw2Bg1World(void *context, uint32_t wtx, uint32_t wty,
     return kWsShadowExact;
 }
 
+/* Sprite spawning. $03:9596 hands the Super FX a scan column at camera X +
+ * table[$73] and a Y band at camera Y + table[$75], from the table at
+ * $03:958E: +$120 / -$30 (X, moving right / left), +$110 / -$20 (Y). Level
+ * sprites on that column come to life. With a wider view the column moves
+ * out by the widest margin, so they are alive before they reach the screen.
+ * All code here is interpreted and reads this table from ROM each time. */
+static void Smw2SetSpawnColumns(bool wide)
+{
+    Cart *cart = g_snes ? g_snes->cart : NULL;
+    if (!cart || !cart->rom || cart->romSize < 0x19596) return;
+    const uint16_t right = wide ? 0x0170 : 0x0120;
+    const uint16_t left = wide ? (uint16_t)-0x0060 : (uint16_t)-0x0030;
+    uint8_t *t = cart->rom + 0x1958E;               /* $03:958E */
+    t[0] = (uint8_t)right; t[1] = (uint8_t)(right >> 8);
+    t[2] = (uint8_t)left;  t[3] = (uint8_t)(left >> 8);
+}
+
 static void Smw2BeginFrame(unsigned number)
 {
     (void)number;
+    static int s_spawn_wide = -1;
+    if (s_spawn_wide != (int)g_ws_active) {
+        Smw2SetSpawnColumns(g_ws_active);
+        s_spawn_wide = g_ws_active;
+    }
     if (!g_ws_active)
         return;
     const int budget = g_ws_extra;
