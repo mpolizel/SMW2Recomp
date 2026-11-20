@@ -321,9 +321,13 @@ static void Smw2BeginFrame(unsigned number)
 {
     (void)number;
     static int s_spawn_wide = -1;
-    if (s_spawn_wide != (int)g_ws_active) {
-        Smw2SetSpawnColumns(g_ws_active);
-        s_spawn_wide = g_ws_active;
+    /* A Mode 2 stage (6-4) raises and lowers its floor per column, and the
+     * game only settles a new sprite on it inside the native view: one born
+     * early in a margin ends up buried in a pillar. Keep native spawning. */
+    const bool spawn_wide = g_ws_active && (g_ppu->bgmode & 7) != 2;
+    if (s_spawn_wide != (int)spawn_wide) {
+        Smw2SetSpawnColumns(spawn_wide);
+        s_spawn_wide = spawn_wide;
     }
     if (!g_ws_active)
         return;
