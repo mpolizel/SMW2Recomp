@@ -49,6 +49,7 @@
 #include "snes/ppu.h"
 #include "snes/snes.h"
 #include "snes/cart.h"
+#include "snes/superfx.h"
 #include "snes/ws_shadow.h"
 #include "common_cpu_infra.h"
 #include <string.h>
@@ -260,6 +261,57 @@ static void Smw2SetOamClip(bool wide, int left_margin, int right_margin)
     memcpy(hi, kWideHi, 8);
 }
 
+/* Offset-per-tile terrain (6-4's rising and falling pillars). The Super FX
+ * routine at $08:9DCF (R8 = camera X, R9 = camera Y) builds the Mode 2 rows
+ * for the 32 native columns: the vertical row ends up at $70:1F32..$1F70 as
+ * camera Y + a per-column lift from the terrain objects in view. Nothing
+ * outside those 32 columns is ever computed, so the margins drew the pillars
+ * where the level map has them. When the routine starts, it is replayed
+ * twice on a private copy of Game Pak RAM with the camera moved 256 left
+ * and right; the two results are the 32 columns on each side, published to
+ * the renderer as the margin row. The real core is never driven. */
+enum { kOptFirst = -32, kOptCount = 96 };
+static uint16_t s_opt_row[kOptCount];
+static bool s_opt_used;
+static int s_opt_shift;
+
+static void Smw2OptShiftCamera(SuperFx *fx, uint32_t pc24, void *ctx)
+{
+    (void)pc24; (void)ctx;
+    superfx_set_reg(fx, 8, (uint16_t)(superfx_reg(fx, 8) + s_opt_shift));
+}
+
+static void Smw2OptRoutine(SuperFx *fx, uint32_t pc24, void *ctx)
+{
+    (void)ctx;
+    static uint8_t *ram;
+    static SuperFx result;
+    if (!fx->ram || fx->ram_size < 0x2000) return;
+    if (!ram) ram = (uint8_t *)malloc(fx->ram_size);
+    if (!ram) return;
+    const SuperFxReplayPcHook hook = { pc24, Smw2OptShiftCamera, NULL };
+    for (int side = 0; side < 2; side++) {
+        s_opt_shift = side ? 256 : -256;
+        memcpy(ram, fx->ram, fx->ram_size);
+        if (!superfx_replay_snapshot_with_hooks(fx, ram, &result, &hook, 1)) return;
+        for (int i = 0; i < 32; i++) {
+            const int k = (side ? 32 + i : i - 32) - kOptFirst;
+            s_opt_row[k] = (uint16_t)(ram[0x1F32 + 2 * i] | ram[0x1F33 + 2 * i] << 8);
+        }
+    }
+    s_opt_used = true;
+}
+
+static void Smw2InstallOptHooks(void)
+{
+    static bool done;
+    Cart *cart = g_snes ? g_snes->cart : NULL;
+    if (done || !cart || !cart->superfx) return;
+    superfx_set_enhancement_mode(cart->superfx, kSuperFxEnhancement_PresentationReplay);
+    superfx_set_pc_hook(cart->superfx, 0x089DCF, Smw2OptRoutine, NULL);
+    done = true;
+}
+
 static void Smw2BeginFrame(unsigned number)
 {
     (void)number;
@@ -318,6 +370,14 @@ static void Smw2BeginFrame(unsigned number)
         if (PPU_clipMode(g_ppu) != 0) left = right = 0;
         PpuSetExtraSideSpace(g_ppu, left, right, 0);
         Smw2SetOamClip(true, left, right);
+        Smw2InstallOptHooks();
+        if (s_log) fprintf(stderr, "[wsopt] used=%d bgmode=%02X row0=%04X row40=%04X row60=%04X\n",
+                           (int)s_opt_used, g_ppu->bgmode, s_opt_row[0], s_opt_row[40], s_opt_row[60]);
+        if (s_opt_used && (g_ppu->bgmode & 7) == 2)
+            PpuSetWidescreenOptMarginV(g_ppu, kOptFirst, s_opt_row, kOptCount);
+        else
+            PpuSetWidescreenOptMarginV(g_ppu, 0, NULL, 0);
+        s_opt_used = false;
         /* In a stage BG3 is scenery (the foreground plants of 1-1), not a
          * status bar: let it fill the margins too. */
         PpuSetWidescreenBg3Widen(g_ppu, 1);
