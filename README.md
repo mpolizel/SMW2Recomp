@@ -71,6 +71,22 @@ the game asks the driver for the dedicated one. If it still runs slowly,
 set the game's executable to **High performance** in Windows Settings →
 System → Display → Graphics.
 
+### Widescreen (experimental)
+
+> **Experimental.** Widescreen is new and still being tested. Some stages
+> or effects may show glitches at the sides. It is **off by default**, and
+> turning it off gives you back the original game exactly.
+
+**Settings → Display → Widescreen** (marked **EXPERIMENTAL**) shows more of
+each stage on the left and right (16:9). It also works from **Ctrl+L** during
+play, mid-stage. The choice is saved as `Widescreen` in `config.ini`
+(`[Graphics]`).
+
+The sides are drawn from the stage's own map, so the scenery is complete.
+Enemies and items appear further out to fill them. Where a stage ends, the
+sides stay black; the world map and the menus keep the original 4:3 view.
+Not every boss has been checked in widescreen yet.
+
 ### Saves and updates
 
 The game's own save (the three save files on the cartridge's battery) is kept

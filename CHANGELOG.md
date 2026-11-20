@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.5 — 2026-11-20
+
+Widescreen, as an **experimental** option that is off by default: Settings →
+Display → Widescreen (marked EXPERIMENTAL), also from Ctrl+L during play.
+Stages show more on the left and right (16:9), drawn from the stage's own map,
+with enemies and items appearing further out to fill the sides. Where a stage
+ends the sides stay black, and the world map and menus keep the original view.
+The floor of stage 6-4, which rises and falls column by column, is drawn in
+the sides too, and its enemies stand on it as in the original. Some stages or
+bosses may still show glitches at the sides. With the option off the game is
+the same as 0.1.4, and your in-game saves and save states from 0.1.4 keep
+loading.
+
 ## 0.1.4 — 2026-11-19
 
 The world map no longer flickers after a bonus game. Once a stage had ended
