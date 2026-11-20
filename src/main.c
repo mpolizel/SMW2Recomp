@@ -52,6 +52,7 @@
 #include "snes/ws_shadow.h"
 #include "common_cpu_infra.h"
 #include <string.h>
+#include <stdlib.h>
 
 #ifdef RECOMP_LAUNCHER
 #include "recomp_launcher.h"
@@ -186,15 +187,49 @@ static WsShadowSource Smw2Bg1World(void *context, uint32_t wtx, uint32_t wty,
  * sprites on that column come to life. With a wider view the column moves
  * out by the widest margin, so they are alive before they reach the screen.
  * All code here is interpreted and reads this table from ROM each time. */
+static void Smw2PatchWord(Cart *cart, uint32_t off, uint16_t v)
+{
+    if (off + 2 < cart->romSize) { cart->rom[off] = (uint8_t)v; cart->rom[off + 1] = (uint8_t)(v >> 8); }
+}
+
+/* Sprite despawn. $03:A299/A2B0/A2C7 test, and $03:A2DE/A2F8 act on, a
+ * sprite's camera-relative X ($7680,X) against three windows: dx+$100 < $300,
+ * dx+$80 < $200, dx+$40 < $180. Outside, $03:A31E removes it (and frees it to
+ * spawn again). Widescreen widens each window by the margin on both sides,
+ * so a sprite spawned for the margin is not removed on the spot. Y is left
+ * alone. */
 static void Smw2SetSpawnColumns(bool wide)
 {
     Cart *cart = g_snes ? g_snes->cart : NULL;
-    if (!cart || !cart->rom || cart->romSize < 0x19596) return;
-    const uint16_t right = wide ? 0x0170 : 0x0120;
-    const uint16_t left = wide ? (uint16_t)-0x0060 : (uint16_t)-0x0030;
-    uint8_t *t = cart->rom + 0x1958E;               /* $03:958E */
-    t[0] = (uint8_t)right; t[1] = (uint8_t)(right >> 8);
-    t[2] = (uint8_t)left;  t[3] = (uint8_t)(left >> 8);
+    if (!cart || !cart->rom || cart->romSize < 0x48C93) return;
+    const uint16_t e = wide ? 0x90 : 0;
+    uint16_t right = wide ? 0x01B0 : 0x0120;
+    uint16_t left = wide ? (uint16_t)-0x00C0 : (uint16_t)-0x0030;
+    const char *er = getenv("SNESRECOMP_WS_SPAWN_RIGHT"), *el = getenv("SNESRECOMP_WS_SPAWN_LEFT");
+    if (wide && er) right = (uint16_t)strtol(er, NULL, 0);   /* experiments */
+    if (wide && el) left = (uint16_t)-strtol(el, NULL, 0);
+    Smw2PatchWord(cart, 0x1958E, right);                    /* $03:958E */
+    Smw2PatchWord(cart, 0x19590, left);
+    static const struct { uint16_t adc, cmp, base_adc, base_cmp; } kWin[] = {
+        { 0xA29D, 0xA2A0, 0x0100, 0x0300 },
+        { 0xA2B4, 0xA2B7, 0x0080, 0x0200 },
+        { 0xA2CB, 0xA2CE, 0x0040, 0x0180 },
+        { 0xA2E2, 0xA2E5, 0x0080, 0x0200 },
+        { 0xA2FC, 0xA2FF, 0x0040, 0x0180 },
+    };
+    /* The Super FX sprite loop ($09:89C1) keeps a sprite while
+     * -m <= dx <= m + $F0, m from the per-class table at $09:8C83 (X margins
+     * $60, $90, $90 for classes 4, 8, 12); outside, $09:8A2F clears its slot.
+     * That is the limit that removed margin-spawned sprites on the spot. */
+    static const struct { uint32_t off; uint16_t base; } kFxMargin[] = {
+        { 0x48C87, 0x0060 }, { 0x48C8B, 0x0090 }, { 0x48C8F, 0x0090 },
+    };
+    for (size_t i = 0; i < sizeof(kFxMargin) / sizeof(kFxMargin[0]); i++)
+        Smw2PatchWord(cart, kFxMargin[i].off, kFxMargin[i].base + e);
+    for (size_t i = 0; i < sizeof(kWin) / sizeof(kWin[0]); i++) {
+        Smw2PatchWord(cart, 0x18000 + (kWin[i].adc - 0x8000) + 1, kWin[i].base_adc + e);
+        Smw2PatchWord(cart, 0x18000 + (kWin[i].cmp - 0x8000) + 1, kWin[i].base_cmp + 2 * e);
+    }
 }
 
 static void Smw2BeginFrame(unsigned number)
