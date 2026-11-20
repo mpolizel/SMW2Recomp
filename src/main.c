@@ -57,6 +57,10 @@
 
 #ifdef RECOMP_LAUNCHER
 #include "recomp_launcher.h"
+/* The widescreen view is this port's own (native_widescreen); the launcher
+ * has no setting for it, so the checkbox reads and writes config.ini here. */
+static int Smw2WidescreenGet(void) { return g_config.widescreen ? 1 : 0; }
+static void Smw2WidescreenSet(int value) { snesrecomp_desktop_set_widescreen(value); }
 /* The host switches to OpenGL whenever a shader is selected; say so where the
  * player picks the renderer. The update check gets its checkbox here too. */
 static void Smw2ConfigureLauncher(RecompLauncherCGameInfo *info)
@@ -70,6 +74,13 @@ static void Smw2ConfigureLauncher(RecompLauncherCGameInfo *info)
     info->host_toggle_get = Smw2UpdateGetEnabled;
     info->host_toggle_set = Smw2UpdateSetEnabled;
 #endif
+    info->host_widescreen_help =
+        "Show more of each stage on the sides (16:9). Still being tested: "
+        "some screens may show glitches. Menus and the world map keep the "
+        "original view.";
+    info->host_widescreen_experimental = 1;
+    info->host_widescreen_get = Smw2WidescreenGet;
+    info->host_widescreen_set = Smw2WidescreenSet;
 }
 #endif
 
@@ -329,8 +340,21 @@ static void Smw2BeginFrame(unsigned number)
         Smw2SetSpawnColumns(spawn_wide);
         s_spawn_wide = spawn_wide;
     }
-    if (!g_ws_active)
+    /* The launcher can switch the view off mid-stage: undo everything the
+     * wide frames set up, so the native picture is the untouched game. */
+    static bool s_ws_was_on;
+    if (!g_ws_active) {
+        if (s_ws_was_on) {
+            Smw2SetOamClip(false, 0, 0);
+            PpuSetExtraSideSpace(g_ppu, 0, 0, 0);
+            PpuSetWidescreenOptMarginV(g_ppu, 0, NULL, 0, 0);
+            PpuSetWidescreenBg3Widen(g_ppu, 0);
+            WsShadowReset();
+            s_ws_was_on = false;
+        }
         return;
+    }
+    s_ws_was_on = true;
     const int budget = g_ws_extra;
     PpuSetWidescreenViewAnchor(g_ppu, true);
     static int s_log = -1;

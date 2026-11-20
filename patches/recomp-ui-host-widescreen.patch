@@ -1,0 +1,117 @@
+diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
+index 932baf6..79d4c0a 100644
+--- a/src/common/backends/imgui/launcher_imgui.cpp
++++ b/src/common/backends/imgui/launcher_imgui.cpp
+@@ -4020,6 +4020,7 @@ bool video_card_grows(const LauncherModel* m) {
+     if (m->has_frame_blend || m->has_vsync) return true;
+     if (m->has_run_ahead) return true;
+     if (m->num_display_layouts > 0) return true;
++    if (m->host_widescreen_get) return true;   // one more row
+     // NES legacy-surface additions (Integer scaling row, HD texture pack block)
+     // add extra rows the fixed no_scroll band wasn't sized for.
+     if (m->has_integer_scale || m->hdpack_supported) return true;
+@@ -4164,6 +4165,34 @@ void draw_render_pipeline_controls(LauncherModel* m, const LauncherTheme& th) {
+     ImGui::EndDisabled();
+ }
+ 
++/* The host-owned Widescreen row (GameInfo.host_widescreen_*), drawn by
++ * both DISPLAY surfaces right under the aspect row. */
++static void draw_host_widescreen_row(LauncherModel* m, const LauncherTheme& th) {
++    const float cb = ImGui::GetFrameHeight();   // a checkbox is square
++    if (!m->host_widescreen_get) return;
++    {
++        /* Host-owned: read on every draw, written back on change. The
++         * EXPERIMENTAL tag follows the checkbox, so it is part of the
++         * width the row reserves (as in draw_aspect_row). */
++        float ctrl_w = cb;
++        if (m->host_widescreen_experimental)
++            ctrl_w += px(8) + ImGui::CalcTextSize("EXPERIMENTAL").x;
++        row_label_right("Widescreen", th, ctrl_w);
++        bool ws = m->host_widescreen_get() != 0;
++        if (ImGui::Checkbox("##host_widescreen", &ws) && m->host_widescreen_set)
++            m->host_widescreen_set(ws ? 1 : 0);
++        const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal);
++        if (m->host_widescreen_experimental) {
++            ImGui::SameLine(0, px(8));
++            ImGui::AlignTextToFramePadding();
++            ImGui::TextColored(col(th.warn), "EXPERIMENTAL");
++        }
++        if ((hovered || ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) &&
++            m->host_widescreen_help && m->host_widescreen_help[0])
++            ImGui::SetTooltip("%s", m->host_widescreen_help);
++    }
++}
++
+ void draw_display_controls(LauncherModel* m, const LauncherTheme& th) {
+     eyebrow("DISPLAY");
+ 
+@@ -4191,6 +4220,7 @@ void draw_display_controls(LauncherModel* m, const LauncherTheme& th) {
+             ImGui::PopID();
+         }
+         draw_aspect_row(m, th);
++        draw_host_widescreen_row(m, th);
+         if (m->has_integer_scale) {   // NES module: snap the image to integer multiples
+             row_label_right("Integer scaling", th, cb);
+             bool is = m->s.integer_scale != 0;
+@@ -4406,6 +4436,7 @@ void draw_display_controls(LauncherModel* m, const LauncherTheme& th) {
+         ImGui::PopID();
+     }
+     draw_aspect_row(m, th);
++    draw_host_widescreen_row(m, th);
+ 
+     if (m->has_sharp_filter) {
+         const float fw = settings_cycle_w(m, "Scaling filter", th,
+diff --git a/src/common/launcher_model.c b/src/common/launcher_model.c
+index 08c08c4..2f9bdca 100644
+--- a/src/common/launcher_model.c
++++ b/src/common/launcher_model.c
+@@ -598,6 +598,10 @@ void launcher_model_init(LauncherModel* m,
+         m->host_toggle_help     = game->host_toggle_help;
+         m->host_toggle_get      = game->host_toggle_get;
+         m->host_toggle_set      = game->host_toggle_set;
++        m->host_widescreen_help = game->host_widescreen_help;
++        m->host_widescreen_experimental = game->host_widescreen_experimental != 0;
++        m->host_widescreen_get  = game->host_widescreen_get;
++        m->host_widescreen_set  = game->host_widescreen_set;
+         m->has_frame_blend      = game->has_frame_blend != 0;
+         m->has_run_ahead        = game->has_run_ahead != 0;
+         m->has_shader           = game->has_shader != 0;
+diff --git a/src/common/launcher_model.h b/src/common/launcher_model.h
+index acfc9b3..db11460 100644
+--- a/src/common/launcher_model.h
++++ b/src/common/launcher_model.h
+@@ -376,6 +376,12 @@ typedef struct {
+     const char* host_toggle_help;
+     int (*host_toggle_get)(void);
+     void (*host_toggle_set)(int value);
++    // Borrowed from GameInfo.host_widescreen_*: a host-owned Widescreen row
++    // in the DISPLAY card. NULL get => none.
++    const char* host_widescreen_help;
++    bool host_widescreen_experimental;
++    int (*host_widescreen_get)(void);
++    void (*host_widescreen_set)(int value);
+     bool has_frame_blend;
+     bool has_run_ahead;
+     bool has_shader;
+diff --git a/src/recomp_launcher.h b/src/recomp_launcher.h
+index d6b9960..482517b 100644
+--- a/src/recomp_launcher.h
++++ b/src/recomp_launcher.h
+@@ -2498,6 +2498,17 @@ typedef struct RecompLauncherCGameInfo {
+     const char*        host_toggle_help;
+     int              (*host_toggle_get)(void);
+     void             (*host_toggle_set)(int value);
++
++    /* A host-owned "Widescreen" checkbox in the DISPLAY card, for a title
++     * whose own wide view the launcher's settings do not model. The host keeps
++     * and persists the value exactly like host_toggle_*. NULL get => no row.
++     * host_widescreen_experimental=1 draws the amber EXPERIMENTAL tag beside
++     * it; host_widescreen_help is the hover text (NULL => none). Appended for
++     * ABI stability. */
++    const char*        host_widescreen_help;
++    int                host_widescreen_experimental;
++    int              (*host_widescreen_get)(void);
++    void             (*host_widescreen_set)(int value);
+ } RecompLauncherCGameInfo;
+ #define RECOMP_LAUNCHER_HAS_VSYNC_VRR 1
+ #define RECOMP_LAUNCHER_HAS_FRAME_GENERATION_HIDDEN 1
