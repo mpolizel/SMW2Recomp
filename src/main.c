@@ -232,6 +232,23 @@ static void Smw2SetSpawnColumns(bool wide)
     }
 }
 
+/* OAM build ($08:B1D8, Super FX): a sprite tile goes to OAM only while
+ * -15 <= x < $100 (IWT R8,#$0100 at $08:B21E), and X bit 8 is set only for
+ * a negative x. For the right margin the upper bound follows the live right
+ * margin each frame, and bit 8 becomes (x >> 8) & 1 (same 8 bytes at
+ * $08:B227: MOVE R11,R0 / FROM R0 TO R9 HIB / WITH R9 AND #1), so a tile at
+ * x 256..256+margin is written as the raw 9-bit X the renderer places in the
+ * right margin. The left bound (-15) is shared with Y and stays. */
+static void Smw2SetOamClip(bool wide, int right_margin)
+{
+    Cart *cart = g_snes ? g_snes->cart : NULL;
+    if (!cart || !cart->rom || cart->romSize < 0x43230) return;
+    static const uint8_t kOrig[8] = { 0xA9, 0x00, 0x2B, 0xB0, 0x0A, 0x02, 0x01, 0xD9 };
+    static const uint8_t kWide[8] = { 0x2B, 0xB0, 0xB0, 0x19, 0xC0, 0x29, 0x3E, 0x71 };
+    memcpy(cart->rom + 0x43227, wide ? kWide : kOrig, 8);
+    Smw2PatchWord(cart, 0x4321F, (uint16_t)(0x100 + (wide ? right_margin : 0)));
+}
+
 static void Smw2BeginFrame(unsigned number)
 {
     (void)number;
@@ -289,6 +306,7 @@ static void Smw2BeginFrame(unsigned number)
         (void)windowed;   /* message boxes use layer windows too: not a transition */
         if (PPU_clipMode(g_ppu) != 0) left = right = 0;
         PpuSetExtraSideSpace(g_ppu, left, right, 0);
+        Smw2SetOamClip(true, right);
         /* In a stage BG3 is scenery (the foreground plants of 1-1), not a
          * status bar: let it fill the margins too. */
         PpuSetWidescreenBg3Widen(g_ppu, 1);
@@ -307,6 +325,7 @@ static void Smw2BeginFrame(unsigned number)
         }
     } else {
         PpuSetExtraSideSpace(g_ppu, 0, 0, 0);
+        Smw2SetOamClip(true, 0);
         if (s_was_level) WsShadowReset();
     }
     s_was_level = level;
