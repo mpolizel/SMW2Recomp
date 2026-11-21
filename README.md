@@ -87,6 +87,17 @@ Enemies and items appear further out to fill them. Where a stage ends, the
 sides stay black; the world map and the menus keep the original 4:3 view.
 Not every boss has been checked in widescreen yet.
 
+### Assist tools / cheats
+
+The launcher's **Assist Tools** page (top right of the main screen) lists
+cheats for the USA 1.0 game, all off by default: **Infinite lives**,
+**Stars never go down**, **Items are not used up**, **Always 30 stars**,
+**Yoshi's color** (the game's eight colors) and **Stage select** (any stage
+you enter from the world map starts the chosen one). Each takes effect at once,
+also from **Ctrl+L** during play, and is kept in `build\cheats.ini`. They are
+off in netplay. A save made while one is on keeps its effect, for example the
+number of lives, or a stage finished through Stage select.
+
 ### Saves and updates
 
 The game's own save (the three save files on the cartridge's battery) is kept
@@ -146,6 +157,7 @@ git -C snesrecomp apply ../patches/snesrecomp-v10-savestates.patch
 git -C snesrecomp apply ../patches/snesrecomp-ws-opt-margin.patch
 git -C recomp-ui apply ../patches/recomp-ui-host-toggle.patch
 git -C recomp-ui apply ../patches/recomp-ui-host-widescreen.patch
+git -C recomp-ui apply ../patches/recomp-ui-hostopts-assist.patch
 ```
 
 `snesrecomp-raster-oam-and-hdma.patch` is the renderer fix shared with the

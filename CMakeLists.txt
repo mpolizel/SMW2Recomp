@@ -40,6 +40,7 @@ add_executable(SuperMarioWorld2YoshisIslandSNESRecomp
     ${SNESRECOMP_RUNNER_SOURCES}
     src/main.c
     src/smw2_update.c
+    src/smw2_cheats.c
     src/host_contract.c
     src/game_rtl.c
     src/gen_stubs.c

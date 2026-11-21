@@ -44,6 +44,7 @@
 
 #include "config.h"
 #include "smw2_update.h"
+#include "smw2_cheats.h"
 #include "common_rtl.h"
 #include "widescreen.h"
 #include "snes/ppu.h"
@@ -61,6 +62,8 @@
  * has no setting for it, so the checkbox reads and writes config.ini here. */
 static int Smw2WidescreenGet(void) { return g_config.widescreen ? 1 : 0; }
 static void Smw2WidescreenSet(int value) { snesrecomp_desktop_set_widescreen(value); }
+/* The Assist Tools page lists the cheats (smw2_cheats.c keeps cheats.ini). */
+static RecompLauncherCHostOption s_cheat_rows[kSmw2CheatCount];
 /* The host switches to OpenGL whenever a shader is selected; say so where the
  * player picks the renderer. The update check gets its checkbox here too. */
 static void Smw2ConfigureLauncher(RecompLauncherCGameInfo *info)
@@ -81,6 +84,23 @@ static void Smw2ConfigureLauncher(RecompLauncherCGameInfo *info)
     info->host_widescreen_experimental = 1;
     info->host_widescreen_get = Smw2WidescreenGet;
     info->host_widescreen_set = Smw2WidescreenSet;
+    const Smw2CheatInfo *cheats = Smw2CheatTable();
+    for (int i = 0; i < kSmw2CheatCount; i++) {
+        s_cheat_rows[i].label = cheats[i].label;
+        s_cheat_rows[i].help = cheats[i].help;
+        s_cheat_rows[i].choices = cheats[i].choices;
+        s_cheat_rows[i].num_choices = cheats[i].num_choices;
+    }
+    info->has_assist_tools = 1;
+    info->assist_tools_note =
+        "Cheats for the USA 1.0 game. Each one takes effect at once, also "
+        "from Ctrl+L during play, and is kept in cheats.ini. They are off in "
+        "netplay. A save made while one is on keeps its effect (for example "
+        "the number of lives).";
+    info->host_options = s_cheat_rows;
+    info->host_option_count = kSmw2CheatCount;
+    info->host_option_get = Smw2CheatGet;
+    info->host_option_set = Smw2CheatSet;
 }
 #endif
 
@@ -331,6 +351,7 @@ static void Smw2InstallOptHooks(void)
 static void Smw2BeginFrame(unsigned number)
 {
     (void)number;
+    Smw2CheatsFrame();
     static int s_spawn_wide = -1;
     /* A Mode 2 stage (6-4) raises and lowers its floor per column, and the
      * game only settles a new sprite on it inside the native view: one born

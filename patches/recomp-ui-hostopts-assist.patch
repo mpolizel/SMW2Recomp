@@ -1,0 +1,153 @@
+diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
+index 79d4c0a..df3a553 100644
+--- a/src/common/backends/imgui/launcher_imgui.cpp
++++ b/src/common/backends/imgui/launcher_imgui.cpp
+@@ -5734,15 +5734,62 @@ void draw_controller_assist_shortcuts(LauncherModel* m,
+         ImGui::TextColored(col(th.warn), "Listening... (Esc cancels, Backspace unbinds)");
+ }
+ 
++/* GameInfo.host_options: one row per option, label left, control right.
++ * The host owns every value (read on each draw, written back on change). */
++static void draw_host_options(LauncherModel* m, const LauncherTheme& th) {
++    const float cb = ImGui::GetFrameHeight();
++    float list_w = px(SETTINGS_CTRL_W);
++    for (int i = 0; i < m->host_option_count; ++i) {
++        const RecompLauncherCHostOption& o = m->host_options[i];
++        for (int c = 0; c < o.num_choices; ++c)
++            if (o.choices && o.choices[c]) {
++                const float w = ImGui::CalcTextSize(o.choices[c]).x +
++                                ImGui::GetFrameHeight() + px(24);
++                if (w > list_w) list_w = w;
++            }
++    }
++    for (int i = 0; i < m->host_option_count; ++i) {
++        const RecompLauncherCHostOption& o = m->host_options[i];
++        if (!o.label) continue;
++        ImGui::PushID(i);
++        const int value = m->host_option_get(i);
++        if (o.num_choices > 0 && o.choices) {
++            row_label_right(o.label, th, list_w);
++            const int cur = value >= 0 && value < o.num_choices ? value : 0;
++            ImGui::SetNextItemWidth(list_w);
++            if (ImGui::BeginCombo("##host_option", o.choices[cur])) {
++                for (int c = 0; c < o.num_choices; ++c) {
++                    if (!o.choices[c]) continue;
++                    if (ImGui::Selectable(o.choices[c], c == cur) &&
++                        m->host_option_set && c != cur)
++                        m->host_option_set(i, c);
++                }
++                ImGui::EndCombo();
++            }
++        } else {
++            row_label_right(o.label, th, cb);
++            bool on = value != 0;
++            if (ImGui::Checkbox("##host_option", &on) && m->host_option_set)
++                m->host_option_set(i, on ? 1 : 0);
++        }
++        if (o.help && o.help[0] &&
++            ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
++            ImGui::SetTooltip("%s", o.help);
++        ImGui::PopID();
++    }
++}
++
+ void draw_assist_tools(LauncherModel* m, const LauncherTheme& th) {
+     if (!begin_panel("assist_tools_page", 0, false)) {
+         end_panel();
+         return;
+     }
+     eyebrow("ASSIST TOOLS / CHEATS");
+-    bool enabled = m->s.assist_tools != 0;
+-    if (ImGui::Checkbox(ui_text("Enable Assist Tools / Cheats"), &enabled))
+-        m->s.assist_tools = enabled ? 1 : 0;
++    if (m->host_option_count <= 0) {
++        bool enabled = m->s.assist_tools != 0;
++        if (ImGui::Checkbox(ui_text("Enable Assist Tools / Cheats"), &enabled))
++            m->s.assist_tools = enabled ? 1 : 0;
++    }
+     ImGui::Dummy(ImVec2(0, px(6)));
+     ImGui::PushStyleColor(ImGuiCol_Text, col(th.text_muted));
+     ImGui::PushTextWrapPos();
+@@ -5753,6 +5800,10 @@ void draw_assist_tools(LauncherModel* m, const LauncherTheme& th) {
+               "features. The game window should disclose when it is active.");
+     ImGui::PopTextWrapPos();
+     ImGui::PopStyleColor();
++    if (m->host_option_count > 0) {
++        ImGui::Dummy(ImVec2(0, px(8)));
++        draw_host_options(m, th);
++    }
+     // Fast-forward speed. Only hosts that publish a range get the slider; a
+     // host that leaves the bounds unset keeps its own fixed rate and the
+     // control stays absent rather than dead.
+diff --git a/src/common/launcher_model.c b/src/common/launcher_model.c
+index 2f9bdca..6fa0aa2 100644
+--- a/src/common/launcher_model.c
++++ b/src/common/launcher_model.c
+@@ -602,6 +602,11 @@ void launcher_model_init(LauncherModel* m,
+         m->host_widescreen_experimental = game->host_widescreen_experimental != 0;
+         m->host_widescreen_get  = game->host_widescreen_get;
+         m->host_widescreen_set  = game->host_widescreen_set;
++        m->host_options         = game->host_options;
++        m->host_option_count    = game->host_options && game->host_option_get
++                                      ? game->host_option_count : 0;
++        m->host_option_get      = game->host_option_get;
++        m->host_option_set      = game->host_option_set;
+         m->has_frame_blend      = game->has_frame_blend != 0;
+         m->has_run_ahead        = game->has_run_ahead != 0;
+         m->has_shader           = game->has_shader != 0;
+diff --git a/src/common/launcher_model.h b/src/common/launcher_model.h
+index db11460..a07836c 100644
+--- a/src/common/launcher_model.h
++++ b/src/common/launcher_model.h
+@@ -382,6 +382,11 @@ typedef struct {
+     bool host_widescreen_experimental;
+     int (*host_widescreen_get)(void);
+     void (*host_widescreen_set)(int value);
++    // Borrowed from GameInfo.host_options*: host-owned Assist Tools rows.
++    const RecompLauncherCHostOption* host_options;
++    int host_option_count;
++    int (*host_option_get)(int index);
++    void (*host_option_set)(int index, int value);
+     bool has_frame_blend;
+     bool has_run_ahead;
+     bool has_shader;
+diff --git a/src/recomp_launcher.h b/src/recomp_launcher.h
+index 482517b..3797efc 100644
+--- a/src/recomp_launcher.h
++++ b/src/recomp_launcher.h
+@@ -1753,6 +1753,17 @@ typedef struct RecompLauncherCRomRevision {
+     const char* note;        /* shown when this one is picked; NULL: none */
+ } RecompLauncherCRomRevision;
+ 
++/* One host-owned option on the Assist Tools page (GameInfo.host_options).
++ * num_choices == 0 draws a checkbox (value 0/1); otherwise a list of
++ * `choices`, the value being the chosen index. `help` is hover text (NULL =>
++ * none). */
++typedef struct RecompLauncherCHostOption {
++    const char*        label;
++    const char*        help;
++    const char* const* choices;
++    int                num_choices;
++} RecompLauncherCHostOption;
++
+ typedef struct RecompLauncherCGameInfo {
+     const char*    name;
+     const char*    region;
+@@ -2509,6 +2520,17 @@ typedef struct RecompLauncherCGameInfo {
+     int                host_widescreen_experimental;
+     int              (*host_widescreen_get)(void);
+     void             (*host_widescreen_set)(int value);
++
++    /* Host-owned options listed on the Assist Tools page (has_assist_tools
++     * must be set), e.g. a title's cheats. The host keeps and persists the
++     * values: the launcher reads host_option_get(i) when it draws and calls
++     * host_option_set(i, value) on every change. With options present the
++     * page's generic "Enable Assist Tools" switch is not drawn. Appended for
++     * ABI stability. */
++    const RecompLauncherCHostOption* host_options;
++    int                host_option_count;
++    int              (*host_option_get)(int index);
++    void             (*host_option_set)(int index, int value);
+ } RecompLauncherCGameInfo;
+ #define RECOMP_LAUNCHER_HAS_VSYNC_VRR 1
+ #define RECOMP_LAUNCHER_HAS_FRAME_GENERATION_HIDDEN 1
