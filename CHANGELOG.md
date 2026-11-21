@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.6 — 2026-11-20
+
+Assist tools / cheats on the launcher's **Assist Tools** page, all off by
+default: infinite lives, stars never go down, items are not used up, always
+30 stars, Yoshi's color (the game's eight colors) and stage select. Each one
+takes effect at once, also from Ctrl+L during play, and is kept in
+`build/cheats.ini`; they are off in netplay. With every cheat off the game is
+the same as 0.1.5, and your in-game saves and save states from 0.1.5 keep
+loading.
+
 ## 0.1.5 — 2026-11-20
 
 Widescreen, as an **experimental** option that is off by default: Settings →
