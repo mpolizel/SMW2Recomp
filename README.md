@@ -159,7 +159,7 @@ git -C snesrecomp apply ../patches/snesrecomp-v10-savestates.patch
 git -C snesrecomp apply ../patches/snesrecomp-ws-opt-margin.patch
 git -C recomp-ui apply ../patches/recomp-ui-host-toggle.patch
 git -C recomp-ui apply ../patches/recomp-ui-host-widescreen.patch
-git -C recomp-ui apply ../patches/recomp-ui-hostopts-assist.patch
+git -C recomp-ui apply ../patches/recomp-ui-host-x-assist-options.patch
 ```
 
 `snesrecomp-raster-oam-and-hdma.patch` is the renderer fix shared with the
