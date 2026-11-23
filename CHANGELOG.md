@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.7 — 2026-11-23
+
+Generate & rebuild works again with the build tools the setup downloads
+(reported in #5). The tools' `env.bat` comes with Unix line endings, which
+the Windows command prompt misreads, so the rebuild window closed before
+building; the setup now runs a Windows-format copy of it. 0.1.6 also failed
+to link with those tools (duplicate `NtCurrentTeb`): the new cheats file
+included the Windows headers in the wrong order. The setup's second step is
+no longer numbered twice. The game itself is the same as 0.1.6, and your
+in-game saves and save states keep loading.
+
 ## 0.1.6 — 2026-11-20
 
 Assist tools / cheats on the launcher's **Assist Tools** page, all off by
