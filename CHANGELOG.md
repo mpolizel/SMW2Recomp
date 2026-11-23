@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.8 — 2026-11-23
+
+A game folder that was moved or renamed rebuilds again instead of failing on
+the old build configuration (only the build configuration is redone; saves are
+never touched), and PowerShell is called by its full path. Your in-game saves
+and save states keep loading.
+
 ## 0.1.7 — 2026-11-23
 
 Generate & rebuild works again with the build tools the setup downloads
