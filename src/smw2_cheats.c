@@ -6,6 +6,15 @@
  * WRAM once per frame before the game runs, like a Pro Action Replay does at
  * each NMI. Turning a ROM code off puts the original byte back.
  */
+/* <windows.h> before any project header: the framework's types.h defines
+ * FORCEINLINE as plain `inline` outside MSVC, and MinGW's winnt.h would then
+ * emit its inline helpers (NtCurrentTeb...) as external definitions here and
+ * in main.c: a duplicate-symbol link error with clang (issue #5). */
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #include "smw2_cheats.h"
 
 #include "common_rtl.h"
@@ -16,10 +25,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
 
 #if defined(SNESRECOMP_NET)
 int snes_netplay_active(void);
