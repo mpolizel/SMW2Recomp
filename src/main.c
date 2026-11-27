@@ -45,6 +45,7 @@
 #include "config.h"
 #include "smw2_update.h"
 #include "smw2_cheats.h"
+#include "smw2_extras.h"
 #include "common_rtl.h"
 #include "widescreen.h"
 #include "snes/ppu.h"
@@ -101,6 +102,7 @@ static void Smw2ConfigureLauncher(RecompLauncherCGameInfo *info)
     info->host_option_count = kSmw2CheatCount;
     info->host_option_get = Smw2CheatGet;
     info->host_option_set = Smw2CheatSet;
+    Smw2ExtrasConfigureLauncher(info);
 }
 #endif
 
@@ -488,6 +490,10 @@ static const SnesDesktopHostGame kGameHost = {
     .num_players         = 1,
     .shader_supported    = 1,
     .after_config        = Smw2AfterConfig,
+    /* Fan hacks and MSU-1 packs chosen in the launcher, applied in memory:
+     * see smw2_extras.c. */
+    .replace_rom         = Smw2ReplaceRom,
+    .on_reset            = Smw2ExtrasOnReset,
     .widescreen_supported = 1,
     .native_widescreen   = 1,
     .prepare_frame       = Smw2PrepareFrame,

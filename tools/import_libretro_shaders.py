@@ -36,7 +36,9 @@ PRESETS = [
     ("Upscaler", "xBRZ", "xbrz/xbrz-freescale.glslp"),
     ("Upscaler", "Super-xBR", "xbr/super-xbr-3p-smoother.glslp"),
     ("Upscaler", "OmniScale", "omniscale/omniscale.glslp"),
+    ("Upscaler", "HQ2x", "hqx/hq2x.glslp"),
     ("Upscaler", "HQ3x", "hqx/hq3x.glslp"),
+    ("Upscaler", "HQ4x", "hqx/hq4x.glslp"),
 ]
 
 KEY_VALUE = re.compile(r"^(\s*)([A-Za-z0-9_]+)(\s*=\s*)(.*?)\s*$")

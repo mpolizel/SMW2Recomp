@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1 — 2026-11-27
+
+Fan hacks and MSU-1 music, both chosen in the launcher's Settings (new EXTRAS
+card). Fan hacks takes the folder where the romhacking.net hacks were unzipped
+and offers each one it recognizes: No Crying, Improved SFX and Red Coins (as
+its three individual patches), Life Saver, Yoshi Color Fix 3.4 and the
+Japan/PAL button colors. MSU-1 music plays a pack made for Conn's MSU-1 patch
+for USA 1.0 instead of the cartridge's music. You bring the files; each is
+checked by its SHA-256 and the card says what it recognized. The ROM file is
+never changed: everything is applied to the ROM in memory after it passed its
+check. With both off nothing changes. The shader list gains the HQ2x and HQ4x
+upscalers. Your saves and save states keep loading.
+
 ## 0.1.10 — 2026-11-24
 
 A ROM that is not the dump this game needs is now refused with a clear message

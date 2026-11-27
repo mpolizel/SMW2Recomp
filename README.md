@@ -57,6 +57,7 @@ presets; choosing one switches the renderer to OpenGL automatically. A fresh
 install starts with no shader (the plain picture), the lightest option for
 any graphics card; pick a CRT or upscaler preset there if yours has room.
 Your choice is saved in `config.ini` and kept. The upscalers include
+**xBRZ**, **Super-xBR**, **HQ2x**, **HQ3x**, **HQ4x**, **OmniScale**,
 **ScaleFX** and the neural **NNEDI3** presets.
 
 During play, **Ctrl+L** (or **Select+L3** on a controller) reopens the
@@ -86,6 +87,38 @@ The sides are drawn from the stage's own map, so the scenery is complete.
 Enemies and items appear further out to fill them. Where a stage ends, the
 sides stay black; the world map and the menus keep the original 4:3 view.
 Not every boss has been checked in widescreen yet.
+
+### Fan hacks and MSU-1 music
+
+The launcher's **Settings** page has an **EXTRAS** card with two options.
+None of the files is included here: you bring your own, as with the ROM.
+
+- **Fan hacks** takes a folder where you unzipped these romhacking.net
+  hacks, in their USA 1.0 versions (Header or Headerless); each one found
+  there becomes a checkbox:
+  - [No Crying, Improved SFX and Red Coins](https://www.romhacking.net/hacks/3945)
+    (Trisma), as the three patches in its `Individual Patches` folder (the
+    combined file overwrites part of Yoshi Color Fix, so it is not used);
+  - [Life Saver](https://www.romhacking.net/hacks/6981) (racknae): lives
+    are kept between resets;
+  - [Yoshi Color Fix](https://www.romhacking.net/hacks/9980) 3.4: X cycles
+    Yoshi's colors;
+  - [Japan/PAL Button Colors](https://www.romhacking.net/hacks/7740).
+- **MSU-1 music** plays an MSU-1 pack: fan-made soundtracks in CD quality
+  instead of the cartridge's music. Choose the folder holding Conn's MSU-1
+  patch for USA 1.0 (`smw2_msu_us_1.0.ips`, from his `smw2_msu1_patch.zip`)
+  and the pack's `smw2_msu1-1.pcm`, `smw2_msu1-2.pcm`, ... tracks. Packs are
+  shared on the
+  [Zeldix forum](https://www.zeldix.net/t1611-super-mario-world-2-yoshi-s-island).
+  Sound effects still come from the console's sound chip.
+
+Each file is checked by its SHA-256, and the card says at once what it
+recognized. Your ROM file is never changed: when the game starts, after the
+ROM passes its own check, the chosen hacks and the pack are applied to the
+copy in memory. With both off the game is exactly as before. The choices are
+kept in `build\extras.ini`; a change made from the in-game launcher applies
+the next time the game starts. After a save state or rewind is loaded, the
+MSU-1 track starts over from its beginning.
 
 ### Assist tools / cheats
 
@@ -159,9 +192,11 @@ git -C snesrecomp apply ../patches/snesrecomp-v10-savestates.patch
 git -C snesrecomp apply ../patches/snesrecomp-ws-opt-margin.patch
 git -C snesrecomp apply ../patches/snesrecomp-x-rewind-hotkey.patch
 git -C snesrecomp apply ../patches/snesrecomp-x-rom-gate.patch
+git -C snesrecomp apply ../patches/snesrecomp-x-rom-replace.patch
 git -C recomp-ui apply ../patches/recomp-ui-host-toggle.patch
 git -C recomp-ui apply ../patches/recomp-ui-host-widescreen.patch
 git -C recomp-ui apply ../patches/recomp-ui-host-x-assist-options.patch
+git -C recomp-ui apply ../patches/recomp-ui-x-host-extras.patch
 ```
 
 `snesrecomp-raster-oam-and-hdma.patch` is the renderer fix shared with the
@@ -284,6 +319,13 @@ turns that back on). Without those arguments and variables nothing changes.
 
 `recomp-ui-host-toggle.patch` lets a title add one checkbox of its own beside
 "Skip launcher on boot"; this project uses it for the update check.
+
+`recomp-ui-x-host-extras.patch` adds an EXTRAS card to the launcher's
+Settings for title-owned options that need a file or a folder (checkbox,
+Browse, the chosen path, a status line and sub-options);
+`snesrecomp-x-rom-replace.patch` lets a title hand the host a different ROM
+image after the verified ROM was read (`SnesDesktopHostGame.replace_rom`).
+This project uses both for fan hacks and MSU-1 packs (`src/smw2_extras.c`).
 
 ## ROM identity
 
